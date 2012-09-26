@@ -6,53 +6,75 @@ import jinja2
 
 from google.appengine.ext import db
 
-template_dir = os.path.join(os.path.dirname(__file__), 'template')
+template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir)
     ,autoescape = True)
-
-form = """
-<form method = "post">
-    what is your name?
-    <br>
-    <label> Month
-        <input type = "text" name= "name">
-    </label>
-    <input type = "submit">
-</form>
-"""
-
-USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
-def valid_username(username):
-    return username and USER_RE.match(username)
-
-PASS_RE = re.compile(r"^.{3,20}$")
-def valid_password(password):
-    return password and PASS_RE.match(password)
-
-EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
-def valid_email(email):
-    return not email or EMAIL_RE.match(email)
 
 def render_str(template, **params):
     t = jinja_env.get_template(template)
     return t.render(params)
 
-class MainPage(webapp2.RequestHandler):
-    def get(self):
-      # self.response.headers['Content-Type'] = 'text/plain'
-        self.response.write(form)
-    def post(self):
-    	self.response.write(self.request)
+def render_post(response, post):
+    response.out.write('<b>' + post.subject + '</b><br>')
+    response.out.write(post.content)
 
-class BaseHandler(webapp2.RequestHandler):
-    """docstring for BaseHandler"""
-    def render(self, template, **kw):
-        self.response.out.write(render_str(template, **kw))
+class BlogHandler(webapp2.RequestHandler):
     def write(self, *a, **kw):
         self.response.out.write(*a,**kw)
+    def render(self, template, **kw):
+        self.write(render_str(template, **kw))
+    def render_str(template, **params):
+        return render_str(template, **params)
         
+#blog unit3
+def blog_key(name = 'default'):
+    return db.Key.from_path('blogs',name)
 
-class Rot13(BaseHandler):
+class Post(db.Model):
+    subject = db.StringProperty(required = True)
+    content = db.TextProperty(required = True)
+    created = db.DateTimeProperty(auto_now_add = True)
+    last_modified = db.DateTimeProperty(auto_now = True)
+    def render(self):
+        self._render_text = self.content.replace('\n', '<br>')
+        return render_str("post.html", p = self)
+
+class BlogFront(BlogHandler):
+    def get(self):
+        posts = db.GqlQuery("select * from Post order by created desc limit 10")
+        self.render('front.html', posts = posts)
+
+class PostPage(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+        if not post:
+            self.error(404)
+            return
+        self.render("permalink.html", post = post)
+
+class NewPost(BlogHandler):
+    def get(self):
+        self.render("newpost.html")
+    def post(self):
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+
+        if subject and content:
+            p = Post(parent = blog_key(), subject = subject, content = content)
+            p.put()
+            self.redirect('/blog/%s' % str(p.key().id()))
+        else:
+            error = "subject and content, please!"
+            self.render("newpost.html", subject=subject, content=content, error=error)
+
+
+# Unit2
+class MainPage(webapp2.RequestHandler):
+    def get(self):
+        self.response.write("Hello")
+
+class Rot13(BlogHandler):
     def get(self):
         self.render('rot13-form.html')
     def post(self):
@@ -62,7 +84,7 @@ class Rot13(BaseHandler):
             rot13 = text.encode('rot13')
         self.render('rot13-form.html', text=rot13)
 
-class Welcome(BaseHandler):
+class Welcome(BlogHandler):
     def get(self):
         usr_name = self.request.get('username')
         if valid_username(usr_name):
@@ -70,7 +92,7 @@ class Welcome(BaseHandler):
         else:
             self.redirect('/unit2/signup')
 
-class Signup(BaseHandler):
+class Signup(BlogHandler):
     def get(self):
         self.render("signup-form.html")
 
@@ -104,12 +126,26 @@ class Signup(BaseHandler):
         else:
             self.redirect('/unit2/welcome?username=' + username)
 
+USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
+def valid_username(username):
+    return username and USER_RE.match(username)
 
+PASS_RE = re.compile(r"^.{3,20}$")
+def valid_password(password):
+    return password and PASS_RE.match(password)
+
+EMAIL_RE  = re.compile(r'^[\S]+@[\S]+\.[\S]+$')
+def valid_email(email):
+    return not email or EMAIL_RE.match(email)
         
 
 
-app = webapp2.WSGIApplication([('/about', MainPage),
+app = webapp2.WSGIApplication([('/', MainPage),
                                ('/unit2/rot13', Rot13),
                                ('/unit2/signup', Signup),
-                               ( '/unit2/welcome', Welcome)],
+                               ('/unit2/welcome', Welcome),
+                               ('/blog/?', BlogFront),
+                               ('/blog/([0-9]+)', PostPage),
+                               ('/blog/newpost', NewPost)
+                               ],
                                debug=True)

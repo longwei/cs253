@@ -1,1 +1,3 @@
-Udacity Homework 2
+Udacity Homework 3
+
+SIMPLE blog
