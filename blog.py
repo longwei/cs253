@@ -18,6 +18,7 @@ def render_post(response, post):
     response.out.write('<b>' + post.subject + '</b><br>')
     response.out.write(post.content)
 
+# webapp2.request is the generic request handler
 class BlogHandler(webapp2.RequestHandler):
     def write(self, *a, **kw):
         self.response.out.write(*a,**kw)
@@ -30,12 +31,15 @@ class BlogHandler(webapp2.RequestHandler):
 class MainPage(BlogHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
+        self.write("Hello CS253\n") 
         visits = self.request.cookies.get('visits', '0')
+        # session demo
         if visits.isdigit():
             visits = int(visits) + 1
         else:
             visits = 0
         self.response.headers.add_header('Set-Cookie', 'visits= %s' % visits)
+        
         self.write("You have been here for %s times" % visits) 
 
 #blog unit3
@@ -135,6 +139,29 @@ class Signup(BlogHandler):
         else:
             self.redirect('/unit2/welcome?username=' + username)
 
+class SearchPage(BlogHandler):
+    def get(self):
+        # self.response.out.write(form)
+        self.render("play.html", 
+            month = 1,
+            day = 2,
+            year = 3,
+            error="no error")
+
+class TestHandle(webapp2.RequestHandler):
+    def get(self):
+        q = self.request.get("q")
+        self.response.out.write(q)
+        # self.response.headers['Content-Type'] = 'text/plain'
+        # self.response.out.write(self.request)
+    def post(self):
+        # q = self.request.get("q")
+        # self.response.out.write(q)
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write(self.request)
+        self.redirect('/')
+
+
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 def valid_username(username):
     return username and USER_RE.match(username)
@@ -148,8 +175,10 @@ def valid_email(email):
     return not email or EMAIL_RE.match(email)
         
 
-
-app = webapp2.WSGIApplication([('/', MainPage),
+# url mapping 
+app = webapp2.WSGIApplication([('/', SearchPage),
+                               ('/testform', TestHandle),
+                               ('/unit4', MainPage),
                                ('/unit2/rot13', Rot13),
                                ('/unit2/signup', Signup),
                                ('/unit2/welcome', Welcome),
