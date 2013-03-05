@@ -43,9 +43,11 @@ class MainPage(BlogHandler):
         self.write("You have been here for %s times" % visits) 
 
 #blog unit3
+#database
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs',name)
 
+# entity or table
 class Post(db.Model):
     subject = db.StringProperty(required = True)
     content = db.TextProperty(required = True)
