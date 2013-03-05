@@ -25,7 +25,19 @@ class BlogHandler(webapp2.RequestHandler):
         self.write(render_str(template, **kw))
     def render_str(template, **params):
         return render_str(template, **params)
-        
+   
+#unit 4
+class MainPage(BlogHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        visits = self.request.cookies.get('visits', '0')
+        if visits.isdigit():
+            visits = int(visits) + 1
+        else:
+            visits = 0
+        self.response.headers.add_header('Set-Cookie', 'visits= %s' % visits)
+        self.write("You have been here for %s times" % visits) 
+
 #blog unit3
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs',name)
@@ -42,6 +54,7 @@ class Post(db.Model):
 class BlogFront(BlogHandler):
     def get(self):
         posts = db.GqlQuery("select * from Post order by created desc limit 10")
+        # posts = Post.all().order('-created')
         self.render('front.html', posts = posts)
 
 class PostPage(BlogHandler):
@@ -70,10 +83,6 @@ class NewPost(BlogHandler):
 
 
 # Unit2
-class MainPage(webapp2.RequestHandler):
-    def get(self):
-        self.response.write("Hello")
-
 class Rot13(BlogHandler):
     def get(self):
         self.render('rot13-form.html')
