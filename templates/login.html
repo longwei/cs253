@@ -2,7 +2,7 @@
 
 <html>
   <head>
-    <title>Blog Sign up</title>
+    <title>Blog login in</title>
     <style type="text/css">
       .label {text-align: right}
       .error {color: red}
@@ -11,7 +11,7 @@
   </head>
 
   <body>
-    <h2>Signup</h2>
+    <h2>Login</h2>
     <form method="post">
       <table>
         <tr>
@@ -31,34 +31,10 @@
             Password
           </td>
           <td>
-            <input type="password" name="password" value="">
+            <input type="password" name="password" value="{{password}}">
           </td>
           <td class="error">
             {{error_password}}
-          </td>
-        </tr>
-
-        <tr>
-          <td class="label">
-            Verify Password
-          </td>
-          <td>
-            <input type="password" name="verify" value="">
-          </td>
-          <td class="error">
-            {{error_verify}}
-          </td>
-        </tr>
-
-        <tr>
-          <td class="label">
-            Email (optional)
-          </td>
-          <td>
-            <input type="text" name="email" value="{{email}}">
-          </td>
-          <td class="error">
-            {{error_email}}
           </td>
         </tr>
       </table>
