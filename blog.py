@@ -98,7 +98,7 @@ class Account(db.Model):
     @classmethod
     def get_id(cls, uid):
         return Account.get_id
-    def login(cls, name, pw):
+    # def login(cls, name, pw):
 
 class MainPage(BlogHandler):
     def get(self):
@@ -250,13 +250,13 @@ class TestHandle(webapp2.RequestHandler):
         q = self.request.get("q")
         self.response.out.write(q)
         # self.response.headers['Content-Type'] = 'text/plain'
-        # self.response.out.write(self.request)
+        self.response.out.write(self.request)
     def post(self):
         # q = self.request.get("q")
         # self.response.out.write(q)
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write(self.request)
-        self.redirect('/static/test.xls')
+        # self.redirect('/static/test.xls')
 
 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
