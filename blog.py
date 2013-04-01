@@ -31,6 +31,8 @@ def valid_pw(name, pw, h):
     ###Your code here
     salt = h.split(",")[1]
     return (h.split(",")[0] == hashlib.sha256(name + pw + salt).hexdigest())
+def users_key(group = 'default'):
+    return db.Key.from_path('users, group')
 
 # h = make_pw_hash('spez', 'hunter2')
 # print valid_pw('spez', 'hunter2', h)
@@ -56,6 +58,25 @@ class BlogHandler(webapp2.RequestHandler):
         self.write(render_str(template, **kw))
     def render_str(template, **params):
         return render_str(template, **params)
+        ##unit 4,
+    def set_secure_cookie(self, name, val):
+        cookies_val = make_secure_val(val)
+        self.response.headers.add_header(
+            'Set-Cookie',
+            '%s=%s; Path=/' % (name, cookies_val))
+    def read_secure_cookie(self, name):
+        cookies_val = self.request.cookies.get(name)
+        return cookies_val and check_secure_val(cookies_val)
+    def login(self, user):
+        self.set_secure_cookie('user_id', str(user.key().id()))
+    def logout(self):
+        self.response.headers.add_header('Set-Cookie', 'user_id=; Path=/')
+    def initialize(self, *a, **kw):
+        webapp2.RequestHandler.initialize(self,*a,**kw)
+        uid = self.read_secure_cookie('user_id')
+        self.user = uid and User.by_id(uid)
+
+
 
 #unit 4
 class Login(BlogHandler):
@@ -91,14 +112,25 @@ class Login(BlogHandler):
         #     self.write("invalid account\n") 
         
 
-class Account(db.Model):
-    username = db.StringProperty(required = True)
+class User(db.Model):
+    name = db.StringProperty(required = True)
     pw_hash = db.StringProperty(required = True)
     email = db.StringProperty
+
     @classmethod
-    def get_id(cls, uid):
-        return Account.get_id
-    # def login(cls, name, pw):
+    def by_id(cls, uid):
+        return User.get_by_id(uid,parent = users_key())
+
+    @classmethod
+    def by_name(cls, name):
+        u = User.all().filter('name =', name).get()
+        return u
+
+    @classmethod
+    def register(cls, name, pw, email):
+
+    @classmethod
+    def login(cls, name, pw):
 
 class MainPage(BlogHandler):
     def get(self):
@@ -139,7 +171,7 @@ class Post(db.Model):
 class BlogFront(BlogHandler):
     def get(self):
         posts = db.GqlQuery("select * from Post order by created desc limit 10")
-        # posts = Post.all().order('-created')
+        posts = Post.all().order('-created')
         self.render('front.html', posts = posts)
 
 class PostPage(BlogHandler):
@@ -184,13 +216,14 @@ class Welcome(BlogHandler):
         if valid_username(usr_name):
             self.render('welcome.html', username = usr_name)
         else:
-            self.redirect('/unit2/signup')
+            self.redirect('/blog/signup')
 
 class Signup(BlogHandler):
     def get(self):
         username_cookie = self.request.cookies.get('username')
         if username_cookie: 
             self.redirect('/blog/welcome?username=' + username_cookie)
+            # self.render('welcome.html', username = username_cookie)
         self.render("signup-form.html")
 
     def post(self):
@@ -225,15 +258,15 @@ class Signup(BlogHandler):
             print "error"
             self.render('signup-form.html', **params)
         else:
-            u = Account(parent = account_key(), username = username, 
-                    password = password, email = email)
+            u = User(parent = account_key(), username = username, 
+                    pw_hash = password, email = email)
             # TODO
             # make_pw_hash(username, password)
             u.put()
             self.response.headers.add_header('Set-Cookie', 'username= %s, Path=/' % str(username) )
             self.redirect('/blog/welcome?username=' + username)
     def usrname_used(self, un):
-        u = db.GqlQuery("select * from Account where username = :1", un)
+        u = db.GqlQuery("select * from User where username = :1", un)
         return u.get()
 
 class SearchPage(BlogHandler):
@@ -277,9 +310,9 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/testform', TestHandle),
                                ('/unit4', MainPage),
                                ('/unit2/rot13', Rot13),
-                               ('/blog/signup', Signup),
-                               ('/blog/login', Login),
-                               ('/blog/welcome', Welcome),
+                               ('/signup', Signup),
+                               ('/login', Login),
+                               ('/welcome', Welcome),
                                ('/blog/?', BlogFront),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost)
