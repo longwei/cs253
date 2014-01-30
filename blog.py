@@ -7,21 +7,20 @@ import datetime
 import time
 from string import letters
 import json
-
+import logging
 import webapp2
 import jinja2
 
+import utilities
+
+from google.appengine.api import memcache
 from google.appengine.ext import db
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
                                autoescape = True)
 
-secret = 'longwei'
-
-def render_str(template, **params):
-    t = jinja_env.get_template(template)
-    return t.render(params)
+secret = 'longwei2'
 
 def make_secure_val(val):
     return '%s|%s' % (val, hmac.new(secret, val).hexdigest())
@@ -63,15 +62,16 @@ class BlogHandler(webapp2.RequestHandler):
         uid = self.read_secure_cookie('user_id')
         self.user = uid and User.by_id(int(uid))
 
-def render_post(response, post):
-    response.out.write('<b>' + post.subject + '</b><br>')
-    response.out.write(post.content)
+# def render_post(response, post):
+#     response.out.write('<b>' + post.subject + '</b><br>')
+#     response.out.write(post.content)
 
 class MainPage(BlogHandler):
   def get(self):
       self.write('Hello, Longwei!')
+      self.write(utilities.do_things("hello"))
 
-#json 
+#json
 
 class PostPageJson(BlogHandler):
     def get(self, post_id):
@@ -80,8 +80,8 @@ class PostPageJson(BlogHandler):
         if not post:
             self.error(404)
             return
-        self.response.headers["Content-Type"] = "application/json; charset=UTF-8"   
-        self.write(json.dumps(post.toJson()))
+        self.response.headers["Content-Type"] = "application/json; charset=UTF-8"
+        self.write(json.dumps(post.toDict()))
 
 class BlogFrontJson(BlogHandler):
     def get(self):
@@ -146,6 +146,10 @@ class User(db.Model):
 def blog_key(name = 'default'):
     return db.Key.from_path('blogs', name)
 
+def render_str(template, **params):
+    t = jinja_env.get_template(template)
+    return t.render(params)
+
 class Post(db.Model):
     subject = db.StringProperty(required = True)
     content = db.TextProperty(required = True)
@@ -155,7 +159,7 @@ class Post(db.Model):
     def render(self):
         self._render_text = self.content.replace('\n', '<br>')
         return render_str("post.html", p = self)
-    def toJson(self):
+    def toDict(self):
         # return dict([(p, getattr(self, p)) for p in self.properties()])
 
         POST_TYPES = (str, str, datetime.date,datetime.date)
@@ -179,10 +183,15 @@ class Post(db.Model):
         return output
 
 
-
 class BlogFront(BlogHandler):
     def get(self):
-        posts = Post.all().order('-created')
+        key = 'blogfront'
+        posts = memcache.get(key)
+        if posts is None:
+            logging.error("DB query")
+            posts = Post.all().order('-created')
+            print posts;
+            memcache.set(key, posts)
         self.render('front.html', posts = posts)
 
 class PostPage(BlogHandler):
@@ -314,11 +323,11 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/?', BlogFront),
                                ('/blog/.json', BlogFrontJson),
                                ('/blog/([0-9]+)', PostPage),
-                               ('/blog/([0-9]+).json', PostPageJson),
+                               ('/blog/([0-9]+).(?:.json)', PostPageJson),
                                ('/blog/newpost', NewPost),
-                               ('/blog/signup', Register),
-                               ('/blog/login', Login),
-                               ('/blog/logout', Logout),
+                               ('/signup', Register),
+                               ('/login', Login),
+                               ('/logout', Logout),
                                ('/blog/welcome', Welcome),
                                ],
                               debug=True)

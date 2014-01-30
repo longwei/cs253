@@ -10,3 +10,5 @@ static/.DS_Store
 .DS_Store
 
 blog.pyc
+
+.idea/*
