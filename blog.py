@@ -157,6 +157,7 @@ class Post(db.Model):
     last_modified = db.DateTimeProperty(auto_now = True)
 
     def render(self):
+        self._permalink = self.key().id()
         self._render_text = self.content.replace('\n', '<br>')
         return render_str("post.html", p = self)
     def toDict(self):
@@ -187,30 +188,41 @@ class BlogFront(BlogHandler):
     def get(self):
         key = 'blogfront'
         posts = memcache.get(key)
+        timestamp_key = 'cacheGenerated'
         if posts is None:
             logging.error("DB query")
             posts = Post.all().order('-created')
-            print posts;
+            memcache.set(timestamp_key, time.time())
             memcache.set(key, posts)
-        self.render('front.html', posts = posts)
+        timeGenerated = memcache.get(timestamp_key)
+        if timeGenerated is None:
+            timeGenerated = time.time()
+        time_elapsed = time.time() - timeGenerated
+        self.render('front.html', posts = posts, time_elapsed = time_elapsed)
 
 class PostPage(BlogHandler):
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-
+        post_cache = memcache.get(post_id)
+        if post_cache is None:
+            post = db.get(key)
+            memcache.set(post_id, [post, time.time()])
+            time_elapsed = 0
+        else:
+            post = post_cache[0]
+            time_elapsed = time.time() - memcache.get(post_id)[1]
         if not post:
             self.error(404)
             return
 
-        self.render("permalink.html", post = post)
+        self.render("permalink.html", post = post, time_elapsed =time_elapsed)
 
 class NewPost(BlogHandler):
     def get(self):
         if self.user:
             self.render("newpost.html")
         else:
-            self.redirect("/login")
+            self.redirect("/blog/login")
 
     def post(self):
         if not self.user:
@@ -222,6 +234,11 @@ class NewPost(BlogHandler):
         if subject and content:
             p = Post(parent = blog_key(), subject = subject, content = content)
             p.put()
+            #i should update the cache not reset it
+            key = 'blogfront'
+            timestamp = 'cacheGenerated'
+            memcache.set(key, None)
+            memcache.set(timestamp, time.time())
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
@@ -316,7 +333,12 @@ class Welcome(BlogHandler):
         if self.user:
             self.render('welcome.html', username = self.user.name)
         else:
-            self.redirect('/signup')
+            self.redirect('/blog/signup')
+
+class Flush(BlogHandler):
+    def get(self):
+        memcache.flush_all()
+        self.redirect('/blog')
 
 
 app = webapp2.WSGIApplication([('/', MainPage),
@@ -325,9 +347,10 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/([0-9]+).(?:.json)', PostPageJson),
                                ('/blog/newpost', NewPost),
-                               ('/signup', Register),
-                               ('/login', Login),
-                               ('/logout', Logout),
+                               ('/blog/signup', Register),
+                               ('/blog/login', Login),
+                               ('/blog/logout', Logout),
                                ('/blog/welcome', Welcome),
+                               ('/blog/flush', Flush),
                                ],
                               debug=True)

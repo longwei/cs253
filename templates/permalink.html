@@ -2,4 +2,7 @@
 
 {% block content %}
   {{post.render() | safe}}
+  <p> Queried {{time_elapsed}} seconds ago </p>
 {% endblock %}
+
+
